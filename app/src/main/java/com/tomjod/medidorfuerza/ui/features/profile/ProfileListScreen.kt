@@ -70,11 +70,11 @@ fun ProfileListScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // Al hacer clic, le decimos al ViewModel que cree el perfil
-                    viewModel.createTestProfile()
+                    // Navegar a la pantalla de creación de perfil
+                    navController.navigate(Screen.ProfileCreate.route)
                 }
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Crear Perfil de Prueba")
+                Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
             }
         }
     ) { padding ->
@@ -88,7 +88,7 @@ fun ProfileListScreen(
             if (profiles.isEmpty()) {
                 // Estado cuando la base de datos está vacía
                 Text(
-                    text = "No hay perfiles.\n\nPresiona el botón (+) para crear uno de prueba.",
+                    text = "No hay perfiles.\n\nPresiona el botón (+) para crear uno.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.Gray,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,

@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tomjod.medidorfuerza.ui.features.measurement.ForceMeterRoute
+import com.tomjod.medidorfuerza.ui.features.profile.ProfileCreateScreen
 import com.tomjod.medidorfuerza.ui.features.profile.ProfileListScreen
 
 /**
@@ -29,7 +30,14 @@ fun AppNavigation() {
             )
         }
 
-        // --- Pantalla 2: Medición ---
+        // --- Pantalla 2: Crear Perfil ---
+        composable(route = Screen.ProfileCreate.route) {
+            ProfileCreateScreen(
+                navController = navController
+            )
+        }
+
+        // --- Pantalla 3: Medición ---
         composable(
             route = Screen.Measurement.route,
             arguments = listOf(

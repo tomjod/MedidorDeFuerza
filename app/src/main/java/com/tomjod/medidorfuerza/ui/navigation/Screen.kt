@@ -5,6 +5,7 @@ package com.tomjod.medidorfuerza.ui.navigation
  */
 sealed class Screen(val route: String) {
     object ProfileList : Screen("profile_list")
+    object ProfileCreate : Screen("profile_create")
     object Measurement : Screen("measurement/{profileId}") {
         // Función helper para construir la ruta con un ID
         fun createRoute(profileId: Long) = "measurement/$profileId"
