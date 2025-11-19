@@ -22,8 +22,8 @@ class FakeBleRepository @Inject constructor() : BleRepository {
     private val _connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
     override val connectionState: StateFlow<BleConnectionState> = _connectionState.asStateFlow()
 
-    private val _forceData = MutableStateFlow<Float?>(0.0f)
-    override val forceData: StateFlow<Float?> = _forceData.asStateFlow()
+    private val _forceData = MutableStateFlow<ForceReadings?>(null)
+    override val forceData: StateFlow<ForceReadings?> = _forceData.asStateFlow()
 
     private val simulationScope = CoroutineScope(Dispatchers.Default)
     private var isSimulating = false
@@ -50,9 +50,12 @@ class FakeBleRepository @Inject constructor() : BleRepository {
     private fun simulateForceData() {
         simulationScope.launch {
             while (isSimulating) {
-                // Genera un valor de fuerza aleatorio entre 20.0 y 45.0
-                val fakeForce = Random.nextFloat() * 25.0f + 20.0f
-                _forceData.value = fakeForce
+                // Genera valores de fuerza aleatorios
+                val isquios = Random.nextFloat() * 25.0f + 20.0f
+                val cuads = Random.nextFloat() * 40.0f + 30.0f
+                val ratio = if (cuads != 0f) isquios / cuads else 0f
+                
+                _forceData.value = ForceReadings(isquios, cuads, ratio)
                 delay(500) // Envía un nuevo dato cada 500ms
             }
         }
@@ -66,7 +69,7 @@ class FakeBleRepository @Inject constructor() : BleRepository {
         isSimulating = false
         simulationScope.launch {
             _connectionState.value = BleConnectionState.Disconnected
-            _forceData.value = 0.0f
+            _forceData.value = null
         }
     }
 
@@ -75,7 +78,7 @@ class FakeBleRepository @Inject constructor() : BleRepository {
      */
     override fun sendTareCommand() {
         if (isSimulating) {
-            _forceData.value = 0.0f
+            _forceData.value = ForceReadings(0f, 0f, 0f)
         }
     }
 
@@ -84,5 +87,13 @@ class FakeBleRepository @Inject constructor() : BleRepository {
      */
     override fun release() {
         isSimulating = false
+    }
+
+    override fun calibrateIsquios(factor: Float) {
+        // No-op for fake repository
+    }
+
+    override fun calibrateCuads(factor: Float) {
+        // No-op for fake repository
     }
 }

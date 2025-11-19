@@ -32,6 +32,13 @@ class BluetoothConfigViewModel @Inject constructor(
     val forceData = bleRepository.forceData
 
     init {
+        // Register listener so changes to the adapter state are propagated automatically
+        permissionManager.registerStateListener(object : BluetoothPermissionManager.BluetoothStateListener {
+            override fun onStateChanged(state: BleConnectionState) {
+                _bluetoothState.value = state
+            }
+        })
+
         // Verificar estado inicial
         checkBluetoothStatus()
 
@@ -154,6 +161,8 @@ class BluetoothConfigViewModel @Inject constructor(
     val connectionState: StateFlow<BleConnectionState> = bluetoothState
 
     override fun onCleared() {
+        // Unregister the permission manager listener to avoid leaks
+        permissionManager.unregisterStateListener()
         super.onCleared()
         bleRepository.release()
     }

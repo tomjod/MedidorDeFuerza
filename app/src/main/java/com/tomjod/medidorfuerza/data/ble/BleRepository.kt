@@ -16,7 +16,7 @@ interface BleRepository {
     /**
      * Un Flow que emite la última lectura de fuerza. Nulo si no hay datos.
      */
-    val forceData: StateFlow<Float?>
+    val forceData: StateFlow<ForceReadings?>
 
     /**
      * Inicia el escaneo de dispositivos BLE.
@@ -37,4 +37,13 @@ interface BleRepository {
      * Libera recursos. Llamar cuando el repositorio ya no sea necesario.
      */
     fun release()
+    /**
+     * Envía el factor de calibración para Isquios.
+     */
+    fun calibrateIsquios(factor: Float)
+
+    /**
+     * Envía el factor de calibración para Cuádriceps.
+     */
+    fun calibrateCuads(factor: Float)
 }

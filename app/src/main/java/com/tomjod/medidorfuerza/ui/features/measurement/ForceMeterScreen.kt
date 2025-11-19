@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -35,18 +37,110 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.tomjod.medidorfuerza.data.ble.BleConnectionState
+import com.tomjod.medidorfuerza.data.ble.ForceReadings
 import com.tomjod.medidorfuerza.data.db.entities.Gender
 import com.tomjod.medidorfuerza.data.db.entities.UserProfile
 
 // --- Define tus colores en ui/theme/Color.kt ---
-private val AppBackgroundColor = Color(0xFF1C1C1E)
-private val TextColorPrimary = Color.White
-private val TextColorSecondary = Color(0xFFAEAEB2)
-private val ButtonColor = Color(0xFF0A84FF)
-private val ButtonColorSecondary = Color(0xFF303032)
-private val StatusColorConnected = Color(0xFF34C759)
-private val StatusColorConnecting = Color(0xFFFF9500)
-private val StatusColorDisconnected = Color(0xFFFF3B30)
+// --- Design System Colors ---
+private val AppBackground = Color(0xFF121212)
+private val SurfaceColor = Color(0xFF1E1E1E)
+private val PrimaryAccent = Color(0xFFBB86FC) // Purple accent
+private val SecondaryAccent = Color(0xFF03DAC6) // Teal accent
+private val TextPrimary = Color(0xFFEEEEEE)
+private val TextSecondary = Color(0xFFB0B0B0)
+private val GoodRatioColor = Color(0xFF4CAF50)
+private val WarningRatioColor = Color(0xFFFFC107)
+private val BadRatioColor = Color(0xFFCF6679)
+
+// --- Status Colors Mapped to Theme ---
+private val StatusColorConnected = GoodRatioColor
+private val StatusColorConnecting = WarningRatioColor
+private val StatusColorDisconnected = BadRatioColor
+
+// --- Custom Components ---
+
+@Composable
+fun MetricCard(
+    title: String,
+    value: String,
+    unit: String,
+    modifier: Modifier = Modifier,
+    iconVector: androidx.compose.ui.graphics.vector.ImageVector? = null
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+            Text(
+                text = unit,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+    }
+}
+
+@Composable
+fun CircularRatioIndicator(
+    ratio: Float,
+    modifier: Modifier = Modifier
+) {
+    val color = when {
+        ratio >= 0.6f -> GoodRatioColor
+        ratio < 0.5f -> BadRatioColor
+        else -> WarningRatioColor
+    }
+    
+    Box(contentAlignment = Alignment.Center, modifier = modifier) {
+        CircularProgressIndicator(
+            progress = 1f,
+            modifier = Modifier.fillMaxSize(),
+            color = SurfaceColor,
+            strokeWidth = 12.dp,
+            trackColor = SurfaceColor,
+        )
+        CircularProgressIndicator(
+            progress = ratio.coerceIn(0f, 1f),
+            modifier = Modifier.fillMaxSize(),
+            color = color,
+            strokeWidth = 12.dp,
+            trackColor = Color.Transparent,
+            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = String.format("%.2f", ratio),
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+            Text(
+                text = "Ratio H/Q",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextSecondary
+            )
+        }
+    }
+}
 
 // --- 1. CONTENEDOR STATEFUL (CON LÓGICA) ---
 
@@ -129,7 +223,7 @@ fun ForceMeterScreen(
     profile: UserProfile?,
     averageForce: Float?,
     connectionState: BleConnectionState,
-    latestForce: Float?,
+    latestForce: ForceReadings?,
     onEvent: (MeasurementEvent) -> Unit,
     onNavigateBack: () -> Unit,
     onConnectClick: () -> Unit
@@ -148,115 +242,127 @@ fun ForceMeterScreen(
     }
 
     val isConnected = connectionState is BleConnectionState.Connected
+    var showCalibrationDialog by remember { mutableStateOf(false) }
+
+    if (showCalibrationDialog) {
+        CalibrationDialog(
+            onDismiss = { showCalibrationDialog = false },
+            onCalibrateIsquios = { factor ->
+                onEvent(MeasurementEvent.CalibrateIsquios(factor))
+                showCalibrationDialog = false
+            },
+            onCalibrateCuads = { factor ->
+                onEvent(MeasurementEvent.CalibrateCuads(factor))
+                showCalibrationDialog = false
+            }
+        )
+    }
 
     // --- UI ---
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = AppBackgroundColor
-    ) {
+    Scaffold(
+        containerColor = AppBackground,
+        topBar = {
+            ProfileHeader(
+                profile = profile,
+                onBackClick = onNavigateBack,
+                onSettingsClick = { showCalibrationDialog = true },
+                showSettings = isConnected
+            )
+        }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(paddingValues)
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. Cabecera (con botón de Atrás)
-            ProfileHeader(
-                profile = profile,
-                onBackClick = onNavigateBack // Evento de navegación
-            )
-
-            // 2. Indicador de Estado
-            Text(
-                text = statusText,
-                color = statusColor,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-            )
-
-            // 3. Bloque de Lectura de Fuerza (Centrado)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.weight(1f)
+            // 1. Status Indicator
+            Surface(
+                color = statusColor.copy(alpha = 0.1f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                modifier = Modifier.padding(vertical = 16.dp)
             ) {
                 Text(
-                    text = String.format("%.1f", latestForce ?: 0.0f),
-                    color = TextColorPrimary,
-                    fontSize = 96.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "KG",
-                    color = TextColorSecondary,
-                    fontSize = 34.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                // 4. Muestra de Promedio
-                Text(
-                    text = "Promedio: ${String.format("%.1f", averageForce ?: 0.0f)} KG",
-                    color = TextColorSecondary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 24.dp)
+                    text = statusText,
+                    color = statusColor,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
-            // 5. Botones de Acción
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. Main Ratio Indicator
+            CircularRatioIndicator(
+                ratio = latestForce?.ratio ?: 0f,
+                modifier = Modifier.size(220.dp)
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // 3. Metrics Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Botón Principal (Conectar / Tarar)
+                MetricCard(
+                    title = "Isquios",
+                    value = String.format("%.1f", latestForce?.isquios ?: 0f),
+                    unit = "Newtons",
+                    modifier = Modifier.weight(1f)
+                )
+                MetricCard(
+                    title = "Cuádriceps",
+                    value = String.format("%.1f", latestForce?.cuads ?: 0f),
+                    unit = "Newtons",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+             // Average
+            Text(
+                text = "Promedio Sesión: ${String.format("%.1f", averageForce ?: 0.0f)} N",
+                style = MaterialTheme.typography.bodyLarge,
+                color = TextSecondary
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // 4. Action Buttons
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(bottom = 32.dp)
+            ) {
                 if (isConnected) {
-                    // Si está conectado, el botón es "Tarar"
                     Button(
                         onClick = { onEvent(MeasurementEvent.TareClicked) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ButtonColor),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = SecondaryAccent),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
                     ) {
-                        Text("Poner en Cero (Tarar)", fontSize = 18.sp)
+                        Text("TARAR (CERO)", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
-                } else {
-                    // Si está desconectado, el botón es "Conectar"
-                    Button(
-                        onClick = onConnectClick, // Llama a la lambda con lógica de permisos
-                        colors = ButtonDefaults.buttonColors(containerColor = ButtonColor),
-                        enabled = connectionState !is BleConnectionState.Connecting && connectionState !is BleConnectionState.Scanning,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                    ) {
-                        Text("Buscar y Conectar", fontSize = 18.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Botón Secundario (Guardar / Desconectar)
-                if (isConnected) {
+                    
                     Button(
                         onClick = { onEvent(MeasurementEvent.SaveClicked) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ButtonColorSecondary),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
                     ) {
-                        Text("Guardar Medición", fontSize = 18.sp)
+                        Text("GUARDAR MEDICIÓN", color = TextPrimary)
                     }
                 } else {
-                    // Puedes poner otro botón aquí si quieres, o dejarlo vacío
+                    Button(
+                        onClick = onConnectClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                    ) {
+                        Text("CONECTAR DISPOSITIVO", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -270,22 +376,31 @@ fun ForceMeterScreen(
 private fun ProfileHeader(
     profile: UserProfile?,
     onBackClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
+    showSettings: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 0.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Botón de "Atrás"
-        IconButton(onClick = onBackClick) {
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier
+                .size(40.dp)
+                .background(SurfaceColor, CircleShape)
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Volver",
-                tint = TextColorPrimary
+                tint = TextPrimary
             )
         }
+
+        Spacer(modifier = Modifier.width(16.dp))
 
         // Foto de Perfil
         Image(
@@ -297,34 +412,113 @@ private fun ProfileHeader(
             contentDescription = "Foto de perfil",
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(60.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(Color.Gray)
-                .border(2.dp, Color.White, CircleShape)
+                .border(1.dp, TextSecondary, CircleShape)
         )
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         // Info de Perfil
         if (profile != null) {
             Column {
                 Text(
                     text = "${profile.nombre} ${profile.apellido}",
-                    color = TextColorPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = "${profile.edad} años",
-                    color = TextColorSecondary,
-                    fontSize = 16.sp
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         } else {
             // Muestra un placeholder mientras carga el perfil
-            Text(text = "Cargando perfil...", color = TextColorSecondary)
+            Text(text = "Cargando...", color = TextSecondary)
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        if (showSettings) {
+            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(SurfaceColor, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Calibrar",
+                    tint = TextPrimary
+                )
+            }
         }
     }
+}
+
+@Composable
+fun CalibrationDialog(
+    onDismiss: () -> Unit,
+    onCalibrateIsquios: (Float) -> Unit,
+    onCalibrateCuads: (Float) -> Unit
+) {
+    var isquiosFactor by remember { mutableStateOf("") }
+    var cuadsFactor by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Calibración de Sensores") },
+        text = {
+            Column {
+                Text("Introduce el factor de calibración para cada sensor:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                OutlinedTextField(
+                    value = isquiosFactor,
+                    onValueChange = { isquiosFactor = it },
+                    label = { Text("Factor Isquios") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                )
+                Button(
+                    onClick = {
+                        isquiosFactor.toFloatOrNull()?.let { onCalibrateIsquios(it) }
+                    },
+                    enabled = isquiosFactor.toFloatOrNull() != null,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                ) {
+                    Text("Calibrar Isquios")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = cuadsFactor,
+                    onValueChange = { cuadsFactor = it },
+                    label = { Text("Factor Cuádriceps") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                )
+                Button(
+                    onClick = {
+                        cuadsFactor.toFloatOrNull()?.let { onCalibrateCuads(it) }
+                    },
+                    enabled = cuadsFactor.toFloatOrNull() != null,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                ) {
+                    Text("Calibrar Cuádriceps")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        }
+    )
 }
 
 // --- 3. PREVIEW ---
@@ -336,7 +530,7 @@ fun ForceMeterScreenPreview_Connected() {
         profile = UserProfile(id = 1, nombre = "Andrea", apellido = "Zunino", edad = 23, fotoUri = null, sexo = Gender.FEMENINO),
         averageForce = 25.5f,
         connectionState = BleConnectionState.Connected,
-        latestForce = 30.1f,
+        latestForce = ForceReadings(20f, 30f, 0.66f),
         onEvent = {},
         onNavigateBack = {},
         onConnectClick = {}
@@ -350,7 +544,7 @@ fun ForceMeterScreenPreview_Disconnected() {
         profile = UserProfile(id = 1, nombre = "Andrea", apellido = "Zunino", edad = 23, fotoUri = null, sexo = Gender.FEMENINO),
         averageForce = 25.5f,
         connectionState = BleConnectionState.Disconnected,
-        latestForce = 0.0f,
+        latestForce = null,
         onEvent = {},
         onNavigateBack = {},
         onConnectClick = {}

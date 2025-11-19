@@ -37,8 +37,8 @@ class BleServiceManager @Inject constructor(
     private val _connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
     override val connectionState: StateFlow<BleConnectionState> = _connectionState.asStateFlow()
 
-    private val _forceData = MutableStateFlow<Float?>(null)
-    override val forceData: StateFlow<Float?> = _forceData.asStateFlow()
+    private val _forceData = MutableStateFlow<ForceReadings?>(null)
+    override val forceData: StateFlow<ForceReadings?> = _forceData.asStateFlow()
 
     // --- Componentes BLE (Privados) ---
     private val bluetoothManager: BluetoothManager =
@@ -173,6 +173,14 @@ class BleServiceManager @Inject constructor(
         println("Recursos de BleServiceManager liberados.")
     }
 
+    override fun calibrateIsquios(factor: Float) {
+        // Not implemented for BLE legacy
+    }
+
+    override fun calibrateCuads(factor: Float) {
+        // Not implemented for BLE legacy
+    }
+
     // --- Lógica Interna (Privada) ---
 
     private fun connectToDevice(device: BluetoothDevice) {
@@ -211,7 +219,8 @@ class BleServiceManager @Inject constructor(
     private fun parseForceData(data: ByteArray) {
         if (data.size == 4) { // Esperamos un float (4 bytes)
             val force = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).float
-            _forceData.value = force
+            // Asumimos que el valor es el ratio por ahora, o solo fuerza
+            _forceData.value = ForceReadings(0f, 0f, force)
         }
     }
 }

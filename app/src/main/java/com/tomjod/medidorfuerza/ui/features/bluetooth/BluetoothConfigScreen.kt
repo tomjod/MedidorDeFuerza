@@ -5,7 +5,6 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,19 +17,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -53,8 +50,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,6 +57,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.tomjod.medidorfuerza.data.ble.BleConnectionState
+import com.tomjod.medidorfuerza.data.ble.ForceReadings
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +69,6 @@ fun BluetoothConfigScreen(
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val forceData by viewModel.forceData.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
 
     // Mostrar mensajes de error como Snackbar
     LaunchedEffect(connectionState) {
@@ -82,15 +78,11 @@ fun BluetoothConfigScreen(
         }
     }
 
-    val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
     val enableBt = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            // Bluetooth is now enabled
-        } else {
-            // User did not enable Bluetooth or an error occurred
-        }
+    ) { _ ->
+        // Notify ViewModel to re-evaluate Bluetooth/permission state after the user responds
+        viewModel.onBluetoothStateChanged()
     }
 
     Scaffold(
@@ -99,7 +91,7 @@ fun BluetoothConfigScreen(
                 title = { Text("Configuración Bluetooth") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -147,8 +139,9 @@ fun BluetoothConfigScreen(
                 TechnicalInfoCard()
             }
 
+            // Show enable-Bluetooth button reactively when ViewModel reports BluetoothDisabled
             item {
-                if (!bluetoothAdapter.isEnabled) {
+                if (connectionState is BleConnectionState.BluetoothDisabled) {
                     Button(
                         onClick = {
                             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -156,7 +149,7 @@ fun BluetoothConfigScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Bluetooth, contentDescription = null)
+                        Icon(Icons.Filled.Bluetooth, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Activar Bluetooth")
                     }
@@ -169,7 +162,7 @@ fun BluetoothConfigScreen(
 @Composable
 private fun DeviceInfoCard(
     connectionState: BleConnectionState,
-    forceData: Float?
+    forceData: ForceReadings?
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -189,31 +182,31 @@ private fun DeviceInfoCard(
             // Icono de estado
             val (icon, iconColor, statusText) = when (connectionState) {
                 is BleConnectionState.Connected -> Triple(
-                    Icons.Default.BluetoothConnected,
+                    Icons.Filled.BluetoothConnected,
                     MaterialTheme.colorScheme.primary,
                     "Dispositivo ESP32 Conectado"
                 )
 
                 is BleConnectionState.Connecting -> Triple(
-                    Icons.Default.BluetoothSearching,
+                    Icons.AutoMirrored.Filled.BluetoothSearching,
                     MaterialTheme.colorScheme.secondary,
                     "Conectando..."
                 )
 
                 is BleConnectionState.Scanning -> Triple(
-                    Icons.Default.BluetoothSearching,
+                    Icons.AutoMirrored.Filled.BluetoothSearching,
                     MaterialTheme.colorScheme.secondary,
                     "Buscando dispositivos..."
                 )
 
                 is BleConnectionState.Error -> Triple(
-                    Icons.Default.BluetoothDisabled,
+                    Icons.Filled.BluetoothDisabled,
                     MaterialTheme.colorScheme.error,
                     "Error de conexión"
                 )
 
                 else -> Triple(
-                    Icons.Default.Bluetooth,
+                    Icons.Filled.Bluetooth,
                     MaterialTheme.colorScheme.onSurfaceVariant,
                     "Desconectado"
                 )
@@ -244,12 +237,19 @@ private fun DeviceInfoCard(
             )
 
             if (forceData != null) {
-                Text(
-                    text = "Última lectura: ${String.format("%.2f", forceData)} N",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Ratio: ${String.format(Locale.getDefault(), "%.2f", forceData.ratio)}",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Isquios: ${String.format(Locale.getDefault(), "%.1f", forceData.isquios)} / Cuads: ${String.format(Locale.getDefault(), "%.1f", forceData.cuads)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -273,7 +273,7 @@ private fun ConnectionStatusCard(
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = Icons.Filled.Settings,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
@@ -296,7 +296,7 @@ private fun ConnectionStatusCard(
                         onClick = onScanClick,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Icon(Icons.Filled.Refresh, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Buscar Dispositivo ESP32")
                     }
@@ -356,7 +356,7 @@ private fun ConnectionStatusCard(
                         onClick = onScanClick,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Icon(Icons.Filled.Refresh, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Reintentar")
                     }
@@ -395,7 +395,7 @@ private fun ConnectionStatusCard(
 
 @Composable
 private fun DeviceControlCard(
-    forceData: Float?,
+    forceData: ForceReadings?,
     onTareClick: () -> Unit
 ) {
     Card(
@@ -434,10 +434,15 @@ private fun DeviceControlCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "${String.format("%.2f", forceData)} N",
+                            text = "Ratio: ${String.format(Locale.getDefault(), "%.2f", forceData.ratio)}",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "I: ${String.format(Locale.getDefault(), "%.1f", forceData.isquios)} / C: ${String.format(Locale.getDefault(), "%.1f", forceData.cuads)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

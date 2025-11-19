@@ -16,4 +16,10 @@ sealed interface MeasurementEvent {
 
     /** El usuario ha pulsado el botón de "Desconectar". */
     object DisconnectClicked : MeasurementEvent
+
+    /** El usuario quiere calibrar los isquios con un factor. */
+    data class CalibrateIsquios(val factor: Float) : MeasurementEvent
+
+    /** El usuario quiere calibrar los cuádriceps con un factor. */
+    data class CalibrateCuads(val factor: Float) : MeasurementEvent
 }

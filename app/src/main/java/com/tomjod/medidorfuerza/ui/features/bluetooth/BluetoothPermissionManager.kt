@@ -23,6 +23,11 @@ class BluetoothPermissionManager(private val context: Context) {
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
 
     /**
+     * Current active listener (kept to allow explicit notifications)
+     */
+    private var currentListener: BluetoothStateListener? = null
+
+    /**
      * Verifica si Bluetooth está soportado en el dispositivo
      */
     fun isBluetoothSupported(): Boolean {
@@ -114,7 +119,9 @@ class BluetoothPermissionManager(private val context: Context) {
         }
     }
 
-    // BroadcastReceiver para escuchar cambios en el estado del adaptador Bluetooth
+    /**
+     * BroadcastReceiver para escuchar cambios en el estado del adaptador Bluetooth
+     */
     private var stateReceiver: BroadcastReceiver? = null
     private var isReceiverRegistered: Boolean = false
 
@@ -127,6 +134,7 @@ class BluetoothPermissionManager(private val context: Context) {
 
     /**
      * Lanza el Intent para pedir al usuario que active Bluetooth usando un launcher de ActivityResult.
+     * Note: the Activity/Composable should forward the launcher's result into [handleEnableBluetoothResult].
      */
     fun requestEnableBluetooth(launcher: ManagedActivityResultLauncher<Intent, Boolean>) {
         launcher.launch(createEnableBluetoothIntent())
@@ -137,17 +145,29 @@ class BluetoothPermissionManager(private val context: Context) {
      * Llama inmediatamente con el estado actual.
      */
     fun registerStateListener(listener: BluetoothStateListener) {
+        currentListener = listener
+
+        // Notify immediately with the current state
+        listener.onStateChanged(getCurrentBluetoothState())
+
         if (isReceiverRegistered) {
-            // ya registrado; notificar estado actual
-            listener.onStateChanged(getCurrentBluetoothState())
+            return
+        }
+
+        // On Android 12+ the app needs BLUETOOTH_CONNECT to receive some Bluetooth broadcasts.
+        val needsConnectPermissionOnS = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+
+        if (needsConnectPermissionOnS) {
+            // Can't rely on ACTION_STATE_CHANGED broadcasts without BLUETOOTH_CONNECT;
+            // the caller should request permissions and/or call handleEnableBluetoothResult after enabling.
             return
         }
 
         stateReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
-                    // Al cambiar el estado del adaptador, recalcular y notificar
-                    listener.onStateChanged(getCurrentBluetoothState())
+                    currentListener?.onStateChanged(getCurrentBluetoothState())
                 }
             }
         }
@@ -155,15 +175,22 @@ class BluetoothPermissionManager(private val context: Context) {
         val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
         context.registerReceiver(stateReceiver, filter)
         isReceiverRegistered = true
+    }
 
-        // Notificar estado actual inmediatamente
-        listener.onStateChanged(getCurrentBluetoothState())
+    /**
+     * Call this from the ActivityResult callback (the boolean result of the enable-Bluetooth request).
+     * This ensures the UI updates immediately after the user enables Bluetooth.
+     */
+    fun handleEnableBluetoothResult(enabled: Boolean) {
+        // Force re-evaluation and notify the current listener
+        currentListener?.onStateChanged(getCurrentBluetoothState())
     }
 
     /**
      * Desregistra el listener para evitar fugas.
      */
     fun unregisterStateListener() {
+        currentListener = null
         if (!isReceiverRegistered) return
         stateReceiver?.let { context.unregisterReceiver(it) }
         stateReceiver = null

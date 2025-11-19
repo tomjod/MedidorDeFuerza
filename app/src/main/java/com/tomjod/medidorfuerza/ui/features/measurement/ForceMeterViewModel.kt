@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tomjod.medidorfuerza.data.ble.BleConnectionState
 import com.tomjod.medidorfuerza.data.ble.BleRepository
+import com.tomjod.medidorfuerza.data.ble.ForceReadings
 import com.tomjod.medidorfuerza.data.db.AppDao
 import com.tomjod.medidorfuerza.data.db.entities.Measurement
 import com.tomjod.medidorfuerza.data.db.entities.UserProfile
@@ -59,7 +60,7 @@ class ForceMeterViewModel @Inject constructor(
     /**
      * Expone la última lectura de fuerza (directamente desde el repositorio).
      */
-    val latestForce: StateFlow<Float?> = bleRepository.forceData
+    val latestForce: StateFlow<ForceReadings?> = bleRepository.forceData
 
 
     // --- 2. MANEJO DE EVENTOS ---
@@ -73,6 +74,8 @@ class ForceMeterViewModel @Inject constructor(
             MeasurementEvent.TareClicked -> bleRepository.sendTareCommand()
             MeasurementEvent.SaveClicked -> saveCurrentMeasurement()
             MeasurementEvent.DisconnectClicked -> bleRepository.disconnect()
+            is MeasurementEvent.CalibrateIsquios -> bleRepository.calibrateIsquios(event.factor)
+            is MeasurementEvent.CalibrateCuads -> bleRepository.calibrateCuads(event.factor)
         }
     }
 
@@ -83,13 +86,13 @@ class ForceMeterViewModel @Inject constructor(
      */
     private fun saveCurrentMeasurement() {
         // Obtenemos el valor actual del flow 'latestForce'
-        val currentForce = latestForce.value
-        if (currentForce != null && currentForce > 0) {
+        val currentReadings = latestForce.value
+        if (currentReadings != null && currentReadings.ratio > 0) {
             viewModelScope.launch {
                 appDao.insertMeasurement(
                     Measurement(
                         profileId = profileId,
-                        forceValue = currentForce,
+                        forceValue = currentReadings.ratio,
                         timestamp = System.currentTimeMillis()
                     )
                 )
