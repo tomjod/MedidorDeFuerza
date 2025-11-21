@@ -107,6 +107,9 @@ class BluetoothClassicServiceManager @Inject constructor(
     }
 
     private fun connect(device: BluetoothDevice) {
+        // First, disconnect any existing connection
+        disconnect()
+        
         _connectionState.value = BleConnectionState.Connecting
         
         // Cancel discovery because it's heavy
@@ -136,12 +139,29 @@ class BluetoothClassicServiceManager @Inject constructor(
     }
 
     override fun disconnect() {
-        connectThread?.cancel()
+        // Cancel discovery if running
+        bluetoothAdapter?.cancelDiscovery()
+        
+        // Cancel and wait for threads to finish
         connectedThread?.cancel()
-        connectThread = null
+        connectThread?.cancel()
+        
+        // Wait a bit for threads to finish cleanup
+        try {
+            connectedThread?.join(500) // Wait max 500ms for thread to finish
+            connectThread?.join(500)
+        } catch (e: InterruptedException) {
+            // Ignore
+        }
+        
+        // Clear references
         connectedThread = null
+        connectThread = null
+        
+        // Update state
         _connectionState.value = BleConnectionState.Disconnected
     }
+
 
     override fun release() {
         disconnect()

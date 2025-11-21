@@ -160,9 +160,11 @@ fun ForceMeterRoute(
     // --- Colectamos los estados del ViewModel ---
     // Usamos collectAsStateWithLifecycle para seguridad en el ciclo de vida.
     val profile by viewModel.profile.collectAsStateWithLifecycle()
-    val averageForce by viewModel.averageForce.collectAsStateWithLifecycle()
+    val measurementCount by viewModel.measurementCount.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val latestForce by viewModel.latestForce.collectAsStateWithLifecycle()
+    val currentSession by viewModel.currentSession.collectAsStateWithLifecycle()
+    val saveSuccess by viewModel.saveSuccess.collectAsStateWithLifecycle()
 
     // --- Lógica de Permisos de Bluetooth ---
     val context = LocalContext.current
@@ -186,9 +188,11 @@ fun ForceMeterRoute(
 
     ForceMeterScreen(
         profile = profile,
-        averageForce = averageForce,
+        measurementCount = measurementCount,
         connectionState = connectionState,
         latestForce = latestForce,
+        currentSession = currentSession,
+        saveSuccess = saveSuccess,
         onEvent = viewModel::onEvent, // Pasamos la función de eventos directamente
         onNavigateBack = {
             navController.navigateUp()
@@ -205,9 +209,16 @@ fun ForceMeterRoute(
                 // Si no, pedimos permisos.
                 permissionLauncher.launch(requiredPermissions)
             }
-        }
+        },
+        onViewHistory = {
+            profile?.let {
+                navController.navigate(com.tomjod.medidorfuerza.ui.navigation.Screen.MeasurementHistory.createRoute(it.id))
+            }
+        },
+        onResetSaveSuccess = viewModel::resetSaveSuccess
     )
 }
+
 
 // --- 2. COMPOSABLE STATELESS (SIN LÓGICA, SOLO UI) ---
 
@@ -221,12 +232,16 @@ fun ForceMeterRoute(
 @Composable
 fun ForceMeterScreen(
     profile: UserProfile?,
-    averageForce: Float?,
+    measurementCount: Int,
     connectionState: BleConnectionState,
     latestForce: ForceReadings?,
+    currentSession: com.tomjod.medidorfuerza.domain.MeasurementSession?,
+    saveSuccess: Boolean,
     onEvent: (MeasurementEvent) -> Unit,
     onNavigateBack: () -> Unit,
-    onConnectClick: () -> Unit
+    onConnectClick: () -> Unit,
+    onViewHistory: () -> Unit,
+    onResetSaveSuccess: () -> Unit
 ) {
     // --- Lógica de UI (derivación de estado) ---
     // Derivamos el texto y color del estado de conexión.
@@ -322,14 +337,62 @@ fun ForceMeterScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-             // Average
-            Text(
-                text = "Promedio Sesión: ${String.format("%.1f", averageForce ?: 0.0f)} N",
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary
-            )
+            // Measurement count and history link
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$measurementCount mediciones guardadas",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextSecondary
+                )
+                if (measurementCount > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(onClick = onViewHistory) {
+                        Text("Ver historial", color = PrimaryAccent)
+                    }
+                }
+            }
+            
+            // Session info (if active)
+            currentSession?.let { session ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = PrimaryAccent.copy(alpha = 0.1f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "📊 Medición en curso: ${session.getReadingCount()} lecturas • ${session.getDurationSeconds()}s",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PrimaryAccent,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            // Save success feedback
+            if (saveSuccess) {
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(2000)
+                    onResetSaveSuccess()
+                }
+                Surface(
+                    color = GoodRatioColor.copy(alpha = 0.1f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Text(
+                        text = "✓ Medición guardada exitosamente",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GoodRatioColor,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
+                }
+            }
 
             // 4. Action Buttons
             Column(
@@ -346,13 +409,25 @@ fun ForceMeterScreen(
                         Text("TARAR (CERO)", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                     
-                    Button(
-                        onClick = { onEvent(MeasurementEvent.SaveClicked) },
-                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(56.dp)
-                    ) {
-                        Text("GUARDAR MEDICIÓN", color = TextPrimary)
+                    // Session controls
+                    if (currentSession == null) {
+                        Button(
+                            onClick = { onEvent(MeasurementEvent.StartSession) },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                        ) {
+                            Text("INICIAR MEDICIÓN", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Button(
+                            onClick = { onEvent(MeasurementEvent.StopAndSaveSession()) },
+                            colors = ButtonDefaults.buttonColors(containerColor = GoodRatioColor),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                        ) {
+                            Text("GUARDAR MEDICIÓN", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
                 } else {
                     Button(
@@ -528,12 +603,16 @@ fun CalibrationDialog(
 fun ForceMeterScreenPreview_Connected() {
     ForceMeterScreen(
         profile = UserProfile(id = 1, nombre = "Andrea", apellido = "Zunino", edad = 23, fotoUri = null, sexo = Gender.FEMENINO),
-        averageForce = 25.5f,
+        measurementCount = 5,
         connectionState = BleConnectionState.Connected,
         latestForce = ForceReadings(20f, 30f, 0.66f),
+        currentSession = null,
+        saveSuccess = false,
         onEvent = {},
         onNavigateBack = {},
-        onConnectClick = {}
+        onConnectClick = {},
+        onViewHistory = {},
+        onResetSaveSuccess = {}
     )
 }
 
@@ -542,11 +621,15 @@ fun ForceMeterScreenPreview_Connected() {
 fun ForceMeterScreenPreview_Disconnected() {
     ForceMeterScreen(
         profile = UserProfile(id = 1, nombre = "Andrea", apellido = "Zunino", edad = 23, fotoUri = null, sexo = Gender.FEMENINO),
-        averageForce = 25.5f,
+        measurementCount = 0,
         connectionState = BleConnectionState.Disconnected,
         latestForce = null,
+        currentSession = null,
+        saveSuccess = false,
         onEvent = {},
         onNavigateBack = {},
-        onConnectClick = {}
+        onConnectClick = {},
+        onViewHistory = {},
+        onResetSaveSuccess = {}
     )
 }

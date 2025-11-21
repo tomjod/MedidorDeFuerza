@@ -22,11 +22,20 @@ interface AppDao {
 
     // --- Consultas de Medición ---
     @Insert
-    suspend fun insertMeasurement(measurement: Measurement)
+    suspend fun insertMeasurement(measurement: Measurement): Long
 
     @Query("SELECT * FROM measurements WHERE profileId = :profileId ORDER BY timestamp DESC")
     fun getMeasurementsForProfile(profileId: Long): Flow<List<Measurement>>
 
-    @Query("SELECT AVG(forceValue) FROM measurements WHERE profileId = :profileId")
-    fun getAverageForceForProfile(profileId: Long): Flow<Float?> // El promedio puede ser nulo
+    @Query("SELECT * FROM measurements WHERE profileId = :profileId ORDER BY timestamp DESC LIMIT :limit")
+    fun getRecentMeasurements(profileId: Long, limit: Int = 10): Flow<List<Measurement>>
+
+    @Query("SELECT * FROM measurements WHERE id = :id")
+    fun getMeasurementById(id: Long): Flow<Measurement?>
+
+    @Query("DELETE FROM measurements WHERE id = :id")
+    suspend fun deleteMeasurement(id: Long)
+
+    @Query("SELECT COUNT(*) FROM measurements WHERE profileId = :profileId")
+    fun getMeasurementCount(profileId: Long): Flow<Int>
 }

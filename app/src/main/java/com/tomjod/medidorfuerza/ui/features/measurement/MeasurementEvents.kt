@@ -12,6 +12,7 @@ sealed interface MeasurementEvent {
     object TareClicked : MeasurementEvent
 
     /** El usuario ha pulsado el botón de "Guardar" la medición actual. */
+    @Deprecated("Use StartSession and StopAndSaveSession instead")
     object SaveClicked : MeasurementEvent
 
     /** El usuario ha pulsado el botón de "Desconectar". */
@@ -22,4 +23,10 @@ sealed interface MeasurementEvent {
 
     /** El usuario quiere calibrar los cuádriceps con un factor. */
     data class CalibrateCuads(val factor: Float) : MeasurementEvent
+
+    /** El usuario inicia una sesión de medición. */
+    object StartSession : MeasurementEvent
+
+    /** El usuario detiene y guarda la sesión de medición actual. */
+    data class StopAndSaveSession(val notes: String? = null) : MeasurementEvent
 }

@@ -2,6 +2,8 @@ package com.tomjod.medidorfuerza.di
 
 import com.tomjod.medidorfuerza.data.ble.BleRepository
 import com.tomjod.medidorfuerza.data.ble.BluetoothClassicServiceManager
+import com.tomjod.medidorfuerza.data.repositories.MeasurementRepository
+import com.tomjod.medidorfuerza.data.repositories.MeasurementRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -17,4 +19,10 @@ abstract class RepositoryModule {
     abstract fun bindBleRepository(
         bleServiceManager: BluetoothClassicServiceManager
     ): BleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMeasurementRepository(
+        measurementRepositoryImpl: MeasurementRepositoryImpl
+    ): MeasurementRepository
 }

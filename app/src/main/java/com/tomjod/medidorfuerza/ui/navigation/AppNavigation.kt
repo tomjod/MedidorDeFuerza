@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tomjod.medidorfuerza.ui.features.bluetooth.BluetoothConfigScreen
 import com.tomjod.medidorfuerza.ui.features.measurement.ForceMeterRoute
+import com.tomjod.medidorfuerza.ui.features.measurement.MeasurementHistoryScreen
 import com.tomjod.medidorfuerza.ui.features.profile.ProfileCreateScreen
 import com.tomjod.medidorfuerza.ui.features.profile.ProfileListScreen
 
@@ -60,6 +61,20 @@ fun AppNavigation() {
             // ForceMeterRoute se encargará de crear el ViewModel
             // y pasar el profileId.
             ForceMeterRoute(
+                navController = navController
+            )
+        }
+
+        // --- Pantalla 5: Historial de Mediciones ---
+        composable(
+            route = Screen.MeasurementHistory.route,
+            arguments = listOf(
+                navArgument("profileId") {
+                    type = NavType.LongType
+                }
+            )
+        ) {
+            MeasurementHistoryScreen(
                 navController = navController
             )
         }

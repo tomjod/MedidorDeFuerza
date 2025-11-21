@@ -164,6 +164,7 @@ class BluetoothConfigViewModel @Inject constructor(
         // Unregister the permission manager listener to avoid leaks
         permissionManager.unregisterStateListener()
         super.onCleared()
-        bleRepository.release()
+        // NO llamamos a bleRepository.release() para mantener la conexión BT activa
+        // La conexión debe persistir mientras la app esté activa
     }
 }

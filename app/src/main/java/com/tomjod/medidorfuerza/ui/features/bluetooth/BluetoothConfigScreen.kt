@@ -111,11 +111,6 @@ fun BluetoothConfigScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                // Header con información del dispositivo
-                DeviceInfoCard(connectionState = connectionState, forceData = forceData)
-            }
-
-            item {
                 // Estado de conexión
                 ConnectionStatusCard(
                     connectionState = connectionState,
@@ -159,6 +154,8 @@ fun BluetoothConfigScreen(
     }
 }
 
+/*
+// Función comentada - ya no se usa porque duplicaba información
 @Composable
 private fun DeviceInfoCard(
     connectionState: BleConnectionState,
@@ -254,6 +251,7 @@ private fun DeviceInfoCard(
         }
     }
 }
+*/
 
 @Composable
 private fun ConnectionStatusCard(
@@ -406,13 +404,17 @@ private fun DeviceControlCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "⚙️ Controles del Dispositivo",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 16.dp),
+                textAlign = TextAlign.Center
             )
 
             if (forceData != null) {
@@ -459,7 +461,8 @@ private fun DeviceControlCard(
                 text = "💡 La función 'Tarar' establece la lectura actual como punto cero para mediciones relativas.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 8.dp),
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -475,13 +478,17 @@ private fun TechnicalInfoCard() {
         )
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "🔧 Información Técnica",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = 12.dp),
+                textAlign = TextAlign.Center
             )
 
             val technicalSpecs = listOf(

@@ -11,4 +11,8 @@ sealed class Screen(val route: String) {
         // Función helper para construir la ruta con un ID
         fun createRoute(profileId: Long) = "measurement/$profileId"
     }
+    object MeasurementHistory : Screen("measurement_history/{profileId}") {
+        // Función helper para construir la ruta con un ID
+        fun createRoute(profileId: Long) = "measurement_history/$profileId"
+    }
 }
