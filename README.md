@@ -83,6 +83,7 @@ Desarrollar una aplicación móvil que permita la medición, almacenamiento y an
 ### Base de Datos (Room)
 
 #### Entidad: UserProfile
+
 ```kotlin
 @Entity(tableName = "user_profiles")
 data class UserProfile(
