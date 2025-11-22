@@ -183,11 +183,26 @@ fun MeasurementCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = formatTime(measurement.timestamp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = formatTime(measurement.timestamp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        // Leg Badge
+                        Surface(
+                            color = if (measurement.leg == "Right") MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = if (measurement.leg == "Right") "DER" else "IZQ",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (measurement.leg == "Right") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
                 IconButton(onClick = { showDeleteDialog = true }) {
                     Icon(
@@ -207,14 +222,14 @@ fun MeasurementCard(
             ) {
                 MeasurementDataColumn(
                     label = "Isquios",
-                    avgValue = measurement.isquiosAvg,
-                    maxValue = measurement.isquiosMax,
+                    value = measurement.isquiosMax,
+                    unit = "N",
                     modifier = Modifier.weight(1f)
                 )
                 MeasurementDataColumn(
                     label = "Cuádriceps",
-                    avgValue = measurement.cuadsAvg,
-                    maxValue = measurement.cuadsMax,
+                    value = measurement.cuadsMax,
+                    unit = "N",
                     modifier = Modifier.weight(1f)
                 )
                 MeasurementDataColumn(
@@ -284,6 +299,7 @@ fun MeasurementDataColumn(
     maxValue: Float? = null,
     value: Float? = null,
     showMax: Boolean = true,
+    unit: String = "",
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -301,9 +317,10 @@ fun MeasurementDataColumn(
         Spacer(modifier = Modifier.height(4.dp))
         
         if (value != null) {
-            // Mostrar un solo valor (para ratio)
+            // Mostrar un solo valor (para ratio o fuerza simple)
+            val formattedValue = if (unit.isNotEmpty()) String.format("%.1f %s", value, unit) else String.format("%.2f", value)
             Text(
-                text = String.format("%.2f", value),
+                text = formattedValue,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )

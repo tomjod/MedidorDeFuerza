@@ -38,7 +38,7 @@ class BluetoothClassicServiceManager @Inject constructor(
         
         const val STX = 0x02.toByte()
         const val ETX = 0x03.toByte()
-        const val EXPECTED_LEN = 0x0C.toByte() // 12 bytes
+        const val EXPECTED_LEN = 0x08.toByte() // 8 bytes (2 floats)
         const val ACK = 0x06.toByte()
         
         const val DEVICE_NAME = "ESP32_Fuerza_HQ"
@@ -217,8 +217,8 @@ class BluetoothClassicServiceManager @Inject constructor(
             var numBytes: Int
             
             // State machine for parsing
-            // STX (1) + LEN (1) + Payload (12) + Checksum (1) + ETX (1) = 16 bytes total
-            val packetSize = 16
+            // STX (1) + LEN (1) + Payload (8) + Checksum (1) + ETX (1) = 12 bytes total
+            val packetSize = 12
             val tempBuffer = ByteArray(packetSize)
             var bufferIndex = 0
             var state = 0 // 0: Waiting for STX, 1: Waiting for rest
@@ -253,7 +253,7 @@ class BluetoothClassicServiceManager @Inject constructor(
                                 }
                             } else if (bufferIndex == packetSize) {
                                 // Packet complete, verify ETX and Checksum
-                                if (tempBuffer[15] == ETX) {
+                                if (tempBuffer[11] == ETX) {
                                     processPacket(tempBuffer)
                                 }
                                 state = 0
@@ -269,9 +269,9 @@ class BluetoothClassicServiceManager @Inject constructor(
         }
 
         private fun processPacket(packet: ByteArray) {
-            // Packet: STX(0) LEN(1) Payload(2..13) Checksum(14) ETX(15)
-            val payload = packet.copyOfRange(2, 14)
-            val receivedChecksum = packet[14]
+            // Packet: STX(0) LEN(1) Payload(2..9) Checksum(10) ETX(11)
+            val payload = packet.copyOfRange(2, 10)
+            val receivedChecksum = packet[10]
             
             // Calculate checksum: XOR of payload
             var calculatedChecksum: Byte = 0
@@ -283,7 +283,8 @@ class BluetoothClassicServiceManager @Inject constructor(
                 val buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
                 val isquios = buffer.float
                 val cuads = buffer.float
-                val ratio = buffer.float
+                // Ratio is no longer sent by ESP32, we calculate it in the app
+                val ratio = 0.0f 
                 
                 _forceData.value = ForceReadings(isquios, cuads, ratio)
             }

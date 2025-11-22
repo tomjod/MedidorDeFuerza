@@ -29,4 +29,15 @@ sealed interface MeasurementEvent {
 
     /** El usuario detiene y guarda la sesión de medición actual. */
     data class StopAndSaveSession(val notes: String? = null) : MeasurementEvent
+
+    // New Workflow Events
+    object StartIsquios : MeasurementEvent
+    object CaptureIsquios : MeasurementEvent
+    object StartCuads : MeasurementEvent
+    object CaptureCuads : MeasurementEvent
+    object CancelMeasurement : MeasurementEvent
+    object ResetMeasurement : MeasurementEvent
+    
+    /** El usuario selecciona la pierna a medir (Left/Right). */
+    data class SelectLeg(val leg: String) : MeasurementEvent
 }

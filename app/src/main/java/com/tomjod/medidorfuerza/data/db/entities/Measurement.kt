@@ -48,5 +48,8 @@ data class Measurement(
     val durationSeconds: Int = 0, // Duración de la sesión de medición
     
     // Notas opcionales
-    val notes: String? = null
+    val notes: String? = null,
+
+    // Pierna medida (Left / Right)
+    val leg: String = "Right"
 )

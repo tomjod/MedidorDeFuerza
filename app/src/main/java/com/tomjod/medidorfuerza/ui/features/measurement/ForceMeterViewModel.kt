@@ -78,14 +78,55 @@ class ForceMeterViewModel @Inject constructor(
     private val _saveSuccess = MutableStateFlow(false)
     val saveSuccess: StateFlow<Boolean> = _saveSuccess.asStateFlow()
 
-    // --- 2. OBSERVADOR DE LECTURAS ---
-    // Cuando hay una sesión activa, acumulamos las lecturas automáticamente
+    // --- 5. SEQUENTIAL MEASUREMENT WORKFLOW ---
+
+    enum class MeasurementStep {
+        IDLE,
+        MEASURING_ISQUIOS,
+        WAITING_FOR_CUADS,
+        MEASURING_CUADS,
+        FINISHED
+    }
+
+    private val _measurementStep = MutableStateFlow(MeasurementStep.IDLE)
+    val measurementStep: StateFlow<MeasurementStep> = _measurementStep.asStateFlow()
+
+    private val _capturedIsquios = MutableStateFlow(0f)
+    val capturedIsquios: StateFlow<Float> = _capturedIsquios.asStateFlow()
+
+    private val _capturedCuads = MutableStateFlow(0f)
+    val capturedCuads: StateFlow<Float> = _capturedCuads.asStateFlow()
+
+    // Temporary max trackers for the current phase
+    private var currentMaxIsquios = 0f
+    private var currentMaxCuads = 0f
+
+    private val _selectedLeg = MutableStateFlow<String?>(null)
+    val selectedLeg: StateFlow<String?> = _selectedLeg.asStateFlow()
+
     init {
         viewModelScope.launch {
             latestForce.collect { reading ->
                 val session = _currentSession.value
                 if (session != null && reading != null) {
                     session.addReading(reading)
+                }
+
+                // Logic for sequential measurement
+                if (reading != null) {
+                    when (_measurementStep.value) {
+                        MeasurementStep.MEASURING_ISQUIOS -> {
+                            if (reading.isquios > currentMaxIsquios) {
+                                currentMaxIsquios = reading.isquios
+                            }
+                        }
+                        MeasurementStep.MEASURING_CUADS -> {
+                            if (reading.cuads > currentMaxCuads) {
+                                currentMaxCuads = reading.cuads
+                            }
+                        }
+                        else -> {}
+                    }
                 }
             }
         }
@@ -107,7 +148,49 @@ class ForceMeterViewModel @Inject constructor(
             is MeasurementEvent.CalibrateCuads -> bleRepository.calibrateCuads(event.factor)
             MeasurementEvent.StartSession -> startSession()
             is MeasurementEvent.StopAndSaveSession -> stopAndSaveSession(event.notes)
+            
+            // New Workflow
+            MeasurementEvent.StartIsquios -> startIsquios()
+            MeasurementEvent.CaptureIsquios -> captureIsquios()
+            MeasurementEvent.StartCuads -> startCuads()
+            MeasurementEvent.CaptureCuads -> captureCuads()
+            MeasurementEvent.CancelMeasurement -> cancelMeasurement()
+            MeasurementEvent.ResetMeasurement -> resetMeasurement()
+            is MeasurementEvent.SelectLeg -> _selectedLeg.value = event.leg
         }
+    }
+
+    private fun startIsquios() {
+        currentMaxIsquios = 0f
+        _measurementStep.value = MeasurementStep.MEASURING_ISQUIOS
+    }
+
+    private fun captureIsquios() {
+        _capturedIsquios.value = currentMaxIsquios
+        _measurementStep.value = MeasurementStep.WAITING_FOR_CUADS
+    }
+
+    private fun startCuads() {
+        currentMaxCuads = 0f
+        _measurementStep.value = MeasurementStep.MEASURING_CUADS
+    }
+
+    private fun captureCuads() {
+        _capturedCuads.value = currentMaxCuads
+        _measurementStep.value = MeasurementStep.FINISHED
+    }
+
+    private fun cancelMeasurement() {
+        _measurementStep.value = MeasurementStep.IDLE
+        _capturedIsquios.value = 0f
+        _capturedCuads.value = 0f
+        currentMaxIsquios = 0f
+        currentMaxCuads = 0f
+        _selectedLeg.value = null
+    }
+
+    private fun resetMeasurement() {
+        cancelMeasurement()
     }
 
     // --- 4. LÓGICA INTERNA ---
@@ -124,13 +207,43 @@ class ForceMeterViewModel @Inject constructor(
      * Detiene la sesión actual y guarda los datos en la base de datos.
      */
     private fun stopAndSaveSession(notes: String?) {
-        val session = _currentSession.value
-        if (session != null) {
-            viewModelScope.launch {
-                val measurement = session.toMeasurement(notes)
-                measurementRepository.saveMeasurement(measurement)
-                _currentSession.value = null // Limpiar sesión
-                _saveSuccess.value = true // Indicar éxito
+        // If we are in the new workflow, we save the captured values
+        if (_measurementStep.value == MeasurementStep.FINISHED) {
+             viewModelScope.launch {
+                 val isquios = _capturedIsquios.value
+                 val cuads = _capturedCuads.value
+                 val ratio = if (cuads > 0) isquios / cuads else 0f
+                 
+                 measurementRepository.saveMeasurement(
+                    com.tomjod.medidorfuerza.data.db.entities.Measurement(
+                        profileId = profileId,
+                        isquiosAvg = isquios, // Using max as avg for now in this mode
+                        isquiosMax = isquios,
+                        cuadsAvg = cuads,
+                        cuadsMax = cuads,
+                        ratio = ratio,
+                        timestamp = System.currentTimeMillis(),
+                        durationSeconds = 0,
+                        notes = notes,
+                        leg = _selectedLeg.value ?: "Right"
+                    )
+                )
+                _saveSuccess.value = true
+                _measurementStep.value = MeasurementStep.IDLE // Reset after save
+                _selectedLeg.value = null // Reset selected leg after saving
+             }
+        } else {
+            // Legacy session saving
+            val session = _currentSession.value
+            if (session != null) {
+                viewModelScope.launch {
+                    val measurement = session.toMeasurement(notes)
+                    // Legacy session doesn't support leg selection explicitly yet, defaulting to Right
+                    measurementRepository.saveMeasurement(measurement.copy(leg = _selectedLeg.value ?: "Right"))
+                    _currentSession.value = null // Limpiar sesión
+                    _saveSuccess.value = true // Indicar éxito
+                    _selectedLeg.value = null // Reset selected leg after saving
+                }
             }
         }
     }
@@ -143,7 +256,9 @@ class ForceMeterViewModel @Inject constructor(
     private fun saveCurrentMeasurement() {
         // Obtenemos el valor actual del flow 'latestForce'
         val currentReadings = latestForce.value
-        if (currentReadings != null && currentReadings.ratio > 0) {
+        if (currentReadings != null) {
+             // If we are in legacy mode, we might not have a ratio if the device doesn't send it.
+             // But this method is deprecated anyway.
             viewModelScope.launch {
                 measurementRepository.saveMeasurement(
                     com.tomjod.medidorfuerza.data.db.entities.Measurement(
@@ -152,9 +267,10 @@ class ForceMeterViewModel @Inject constructor(
                         isquiosMax = currentReadings.isquios,
                         cuadsAvg = currentReadings.cuads,
                         cuadsMax = currentReadings.cuads,
-                        ratio = currentReadings.ratio,
+                        ratio = currentReadings.ratio, // Will be 0 from device now
                         timestamp = System.currentTimeMillis(),
-                        durationSeconds = 0
+                        durationSeconds = 0,
+                        leg = _selectedLeg.value ?: "Right"
                     )
                 )
                 _saveSuccess.value = true

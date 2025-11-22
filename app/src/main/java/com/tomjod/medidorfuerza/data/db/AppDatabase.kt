@@ -12,7 +12,7 @@ import com.tomjod.medidorfuerza.data.db.entities.UserProfile
  */
 @Database(
     entities = [UserProfile::class, Measurement::class],
-    version = 3, // Incrementado de 2 a 3 para el nuevo esquema de Measurement
+    version = 4, // Incrementado de 3 a 4 para agregar columna 'leg'
     exportSchema = false
 )
 @TypeConverters(Converters::class)
