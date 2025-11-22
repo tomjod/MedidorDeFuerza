@@ -12,8 +12,8 @@ Este proyecto fue desarrollado como parte de una tesis de grado, con el objetivo
 
 ## 📥 Descargar APK
 
-**Versión actual:** v1.0.0  
-**Descarga directa:** [ForceMetrics-v1.0.0-debug.apk](releases/ForceMetrics-v1.0.0-debug.apk)
+**Versión actual:** v1.1.0  
+**Descarga directa:** [ForceMetrics-v1.1.0-debug.apk](releases/ForceMetrics-v1.1.0-debug.apk)
 
 Para más información sobre la instalación y notas de la versión, consulta la [documentación de releases](releases/README.md).
 
@@ -198,28 +198,29 @@ UserProfile (1) ──────< (N) Measurement
 
 - `ProfileListScreen`: Lista de perfiles
 - `ProfileCreateScreen`: Creación de nuevo perfil
-- `ProfileDetailScreen`: Detalles del perfil
+-   `ProfileListScreen`: Lista de perfiles
+-   `ProfileCreateScreen`: Creación de nuevo perfil
+-   `ProfileDetailScreen`: Detalles del perfil
 
 ### 2. Medición de Fuerza
 
 **Características:**
 
-- Conexión automática con dispositivo ESP32
-- Visualización en tiempo real de:
-  - Fuerza isquiotibiales (N)
-  - Fuerza cuádriceps (N)
-  - Ratio H/Q
-- Sistema de sesiones:
-  - Iniciar sesión de medición
-  - Acumular múltiples lecturas
-  - Calcular promedios y máximos
-  - Guardar sesión completa
-- Función de tarado (poner en cero)
-- Calibración de sensores
+-   Conexión automática con dispositivo ESP32
+-   **Flujo secuencial guiado**:
+    -   Selección de pierna (Izquierda/Derecha)
+    -   Medición de Isquiotibiales
+    -   Medición de Cuádriceps
+    -   Resultado final con Ratio H/Q
+-   Visualización dinámica:
+    -   Gauge circular grande para la medición activa
+    -   Tarjetas de resultados al finalizar
+-   Función de tarado (poner en cero)
+-   Interfaz dedicada para estado desconectado
 
 **Pantalla:**
 
-- `ForceMeterScreen`: Medición en tiempo real
+-   `ForceMeterScreen`: Medición guiada paso a paso
 
 ### 3. Historial de Mediciones
 
@@ -319,20 +320,22 @@ Fecha,Hora,Isquios Avg (N),Isquios Max (N),Cuads Avg (N),Cuads Max (N),Ratio H/Q
    ↓
 2. CONECTAR DISPOSITIVO BLUETOOTH
    ↓
-3. INICIAR SESIÓN DE MEDICIÓN
+3. SELECCIONAR PIERNA (Izquierda/Derecha)
    ↓
-4. REALIZAR MEDICIONES
-   │ (múltiples lecturas acumuladas)
+4. MEDIR ISQUIOTIBIALES
+   │ (Visualización en tiempo real)
    ↓
-5. DETENER Y GUARDAR SESIÓN
-   │ (cálculo de promedios/máximos)
+5. MEDIR CUÁDRICEPS
+   │ (Visualización en tiempo real)
    ↓
-6. VISUALIZAR EN HISTORIAL
+6. RESULTADOS Y RATIO
+   │ (Cálculo automático)
    ↓
-7. EXPORTAR DATOS (opcional)
+7. GUARDAR SESIÓN
    ↓
-8. ANÁLISIS EXTERNO
-   (Excel, SPSS, etc.)
+8. VISUALIZAR EN HISTORIAL
+   ↓
+9. EXPORTAR DATOS (opcional)
 ```
 
 ### Diagrama de Secuencia: Medición
