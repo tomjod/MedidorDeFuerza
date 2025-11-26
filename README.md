@@ -12,8 +12,8 @@ Este proyecto fue desarrollado como parte de una tesis de grado, con el objetivo
 
 ## 📥 Descargar APK
 
-**Versión actual:** v1.1.0  
-**Descarga directa:** [ForceMetrics-v1.1.0-debug.apk](releases/ForceMetrics-v1.1.0-debug.apk)
+**Versión actual:** v1.1.1  
+**Descarga directa:** [ForceMetrics-v1.1.1-debug.apk](https://github.com/tomjod/Medidor-De-Fuerza-Android/releases/download/v1.1.1/app-debug.apk)
 
 Para más información sobre la instalación y notas de la versión, consulta la [documentación de releases](releases/README.md).
 
@@ -525,13 +525,17 @@ La aplicación solicita permisos en tiempo de ejecución siguiendo las mejores p
 
 ### 2. Realizar una Medición
 
-1. Seleccionar perfil
-2. Ir a "Medición"
-3. Verificar conexión Bluetooth
-4. Tarar el dispositivo (poner en cero)
-5. Iniciar sesión de medición
-6. Realizar las mediciones necesarias
-7. Detener y guardar sesión
+1.  **Seleccionar Perfil**: Elige el atleta desde la lista.
+2.  **Conexión**:
+    *   Si no estás conectado, verás una pantalla "Conecta tu dispositivo".
+    *   Pulsa "IR A CONFIGURACIÓN BLUETOOTH" para conectar.
+    *   La app pedirá permisos automáticamente si faltan.
+3.  **Selección de Pierna**: Elige qué pierna vas a medir (Izquierda o Derecha).
+4.  **Medición Secuencial**:
+    *   **Paso 1: Isquiotibiales**: Pulsa "EMPEZAR CON ISQUIOS" y realiza el esfuerzo. Pulsa "TERMINAR ISQUIOS" al finalizar.
+    *   **Paso 2: Cuádriceps**: Pulsa "CONTINUAR CON CUÁDRICEPS" y repite el proceso.
+5.  **Resultados**: Verás el Ratio H/Q calculado automáticamente.
+6.  **Guardar**: Pulsa "GUARDAR RESULTADO" para almacenar la sesión en el historial.
 
 ### 3. Consultar Historial
 
